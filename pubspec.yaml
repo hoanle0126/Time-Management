@@ -32,12 +32,14 @@ dependencies:
   internet_connection_checker: ^1.0.0+1
   fl_chart: ^0.66.0
 
-  flutter_local_notifications: ^16.0.0
+  flutter_local_notifications: ^17.2.3
   permission_handler: ^11.0.1 # Để xin quyền thông báo
   google_generative_ai: 0.4.6
   google_fonts: ^6.1.0 # Font chữ đẹp hơn
   percent_indicator: ^4.2.3 # Vẽ thanh Level đẹp
   confetti: ^0.7.0 # Pháo giấy khi lên cấp
+  flutter_launcher_icons: ^0.13.1
+  table_calendar: ^3.0.9
 
 dev_dependencies:
   flutter_test:
@@ -53,3 +55,12 @@ flutter:
   uses-material-design: true
   # assets:
   #   - assets/images/
+
+flutter_launcher_icons:
+  android: "launcher_icon" # Tên file icon trên Android
+  ios: true # Có tạo cho iOS
+  image_path: "assets/icon/logo.png" # Đường dẫn file ảnh gốc
+  min_sdk_android: 21 # Hỗ trợ Android cũ
+  web:
+    generate: true
+    image_path: "assets/icon/logo.png"

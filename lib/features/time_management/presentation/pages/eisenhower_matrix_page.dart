@@ -10,16 +10,15 @@ import 'package:percent_indicator/linear_percent_indicator.dart';
 import '../bloc/task_bloc.dart';
 import '../../domain/entities/task_entity.dart';
 import '../widgets/eisenhower_extensions.dart';
-import '../widgets/task_card.dart';
 import '../../data/models/task_model.dart';
 import '../../../../core/services/gemini_service.dart';
 
 // Import trang con
 import '../../../pomodoro/presentation/pages/pomodoro_page.dart';
 import 'statistics_page.dart';
+import 'calendar_page.dart'; // Import trang lịch trình
 
-// --- USER STATS MODEL (Tích hợp nhanh để chạy luôn) ---
-// Trong dự án thực tế, bạn nên tách file ra nhé.
+// --- USER STATS MODEL (Giữ nguyên để chạy tính năng Game) ---
 @HiveType(typeId: 1)
 class UserStats extends HiveObject {
   @HiveField(0)
@@ -43,9 +42,6 @@ class UserStats extends HiveObject {
   }
 }
 
-// Nhớ đăng ký Adapter cho UserStats trong main.dart nếu tách file.
-// Nếu lười, ta dùng Box<dynamic> tạm thời.
-
 class EisenhowerMatrixPage extends StatefulWidget {
   const EisenhowerMatrixPage({super.key});
 
@@ -67,9 +63,7 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
   }
 
   Future<void> _initUserData() async {
-    // Mở Box riêng cho User Stats
     _userBox = await Hive.openBox('user_stats');
-    // Đọc dữ liệu, nếu chưa có thì tạo mới
     final level = _userBox.get('level', defaultValue: 1);
     final xp = _userBox.get('xp', defaultValue: 0);
     final maxXp = _userBox.get('maxXp', defaultValue: 100);
@@ -82,7 +76,6 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
   void _addXp(int amount) {
     setState(() {
       bool levelUp = _stats.addXp(amount);
-      // Lưu lại vào Hive
       _userBox.put('level', _stats.level);
       _userBox.put('xp', _stats.currentXp);
       _userBox.put('maxXp', _stats.xpToNextLevel);
@@ -126,12 +119,12 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA), // Màu nền hiện đại
+      backgroundColor: const Color(0xFFF5F7FA),
       body: Stack(
         children: [
           CustomScrollView(
             slivers: [
-              // 1. HEADER HIỆN ĐẠI (SliverAppBar)
+              // --- 1. HEADER (DASHBOARD) ---
               SliverAppBar(
                 expandedHeight: 180.0,
                 floating: false,
@@ -167,7 +160,6 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                                         fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            // Avatar + Level Badge
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
@@ -187,14 +179,14 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Thanh XP
                         Row(
                           children: [
                             Expanded(
                               child: LinearPercentIndicator(
                                 lineHeight: 8.0,
                                 percent:
-                                    _stats.currentXp / _stats.xpToNextLevel,
+                                    (_stats.currentXp / _stats.xpToNextLevel)
+                                        .clamp(0.0, 1.0),
                                 backgroundColor: Colors.white24,
                                 progressColor: Colors.amber,
                                 barRadius: const Radius.circular(10),
@@ -213,6 +205,16 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                   ),
                 ),
                 actions: [
+                  // Nút Lịch Trình (Smart Schedule)
+                  IconButton(
+                    icon: const Icon(Icons.calendar_month_outlined,
+                        color: Colors.white),
+                    tooltip: 'Lịch trình',
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const CalendarPage())),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.bar_chart_rounded,
                         color: Colors.white),
@@ -231,7 +233,7 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                 ],
               ),
 
-              // 2. BODY MA TRẬN
+              // --- 2. BODY MATRIX ---
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -254,12 +256,9 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(
-                  child: SizedBox(height: 80)), // Padding bottom
+              const SliverToBoxAdapter(child: SizedBox(height: 80)),
             ],
           ),
-
-          // Hiệu ứng pháo giấy
           Align(
             alignment: Alignment.topCenter,
             child: ConfettiWidget(
@@ -284,7 +283,7 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
     );
   }
 
-  // --- LOGIC LAYOUT ---
+  // --- LOGIC GIAO DIỆN (Layout) ---
   Widget _buildMobileLayout(List<TaskEntity> tasks) {
     return Column(
         children: EisenhowerQuadrant.values
@@ -384,27 +383,29 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                               decoration: task.isCompleted
                                   ? TextDecoration.lineThrough
                                   : null)),
-                      subtitle: Text(task.description,
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                        "${task.description}\n⏱ ${task.durationMinutes} phút", // Hiển thị thời gian dự kiến
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      isThreeLine: true,
                       leading: Checkbox(
                         value: task.isCompleted,
                         activeColor: quadrant.headerColor,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(4)),
                         onChanged: (val) {
-                          // LOGIC HOÀN THÀNH TASK VÀ NHẬN XP
-                          // 1. Cập nhật UI Task
-                          // 2. Cộng XP
                           if (val == true && !task.isCompleted) {
-                            _addXp(50); // Cộng 50 XP khi xong việc
+                            _addXp(50);
                             ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                     content: Text("+50 XP! Keep going!"),
                                     backgroundColor: Colors.amber,
                                     duration: Duration(milliseconds: 500)));
                           }
-                          // Tạm thời gọi update UI (Đúng ra phải gọi BLoC update status)
-                          // Bạn cần thêm logic UpdateStatus trong BLoC sau nhé.
+                          // Gửi event update task (đánh dấu hoàn thành) vào BLoC tại đây nếu cần
                         },
                       ),
                       onTap: () =>
@@ -417,16 +418,36 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
     );
   }
 
-  // --- LOGIC DIALOG (Giữ nguyên như cũ, chỉ chỉnh lại Font) ---
+  // --- LOGIC DIALOG: AI + MANUAL SCHEDULING (CHỌN TAY) ---
   void _showAddTaskDialog(BuildContext context, {TaskEntity? taskToEdit}) {
     final isEditing = taskToEdit != null;
+
+    // Controller cho Text
     final titleController =
         TextEditingController(text: isEditing ? taskToEdit.title : '');
     final descController =
         TextEditingController(text: isEditing ? taskToEdit.description : '');
-    bool isAnalyzing = false;
+
+    // State cho Phân loại & Thời gian
     EisenhowerQuadrant selectedQuadrant =
         isEditing ? taskToEdit.quadrant : EisenhowerQuadrant.doFirst;
+    int durationMinutes =
+        isEditing ? taskToEdit.durationMinutes : 30; // Mặc định 30p
+
+    // --- BIẾN MỚI CHO VIỆC CHỌN LỊCH THỦ CÔNG ---
+    DateTime selectedDate = isEditing && taskToEdit.startTime != null
+        ? taskToEdit.startTime!
+        : DateTime.now();
+
+    TimeOfDay? selectedStartTime = isEditing && taskToEdit.startTime != null
+        ? TimeOfDay.fromDateTime(taskToEdit.startTime!)
+        : null; // Mặc định null (Chưa xếp giờ)
+
+    TimeOfDay? selectedEndTime = isEditing && taskToEdit.endTime != null
+        ? TimeOfDay.fromDateTime(taskToEdit.endTime!)
+        : null;
+
+    bool isAnalyzing = false;
     final geminiService = GeminiService();
 
     showDialog(
@@ -434,17 +455,82 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (ctx, setState) {
+            // Hàm chọn Ngày
+            Future<void> pickDate() async {
+              final picked = await showDatePicker(
+                context: ctx,
+                initialDate: selectedDate,
+                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (picked != null) {
+                setState(() => selectedDate = picked);
+              }
+            }
+
+            // Hàm chọn Giờ (Start/End)
+            Future<void> pickTime({required bool isStart}) async {
+              final initial = isStart
+                  ? (selectedStartTime ?? TimeOfDay.now())
+                  : (selectedEndTime ?? TimeOfDay.now());
+
+              final picked =
+                  await showTimePicker(context: ctx, initialTime: initial);
+
+              if (picked != null) {
+                setState(() {
+                  if (isStart) {
+                    selectedStartTime = picked;
+                    // Tự động set EndTime = StartTime + Duration (nếu EndTime chưa có)
+                    if (selectedEndTime == null) {
+                      final startDt =
+                          DateTime(2024, 1, 1, picked.hour, picked.minute);
+                      final endDt =
+                          startDt.add(Duration(minutes: durationMinutes));
+                      selectedEndTime = TimeOfDay.fromDateTime(endDt);
+                    }
+                  } else {
+                    selectedEndTime = picked;
+                    // Tính lại Duration nếu người dùng chọn EndTime thủ công
+                    if (selectedStartTime != null) {
+                      final startDt = DateTime(2024, 1, 1,
+                          selectedStartTime!.hour, selectedStartTime!.minute);
+                      final endDt =
+                          DateTime(2024, 1, 1, picked.hour, picked.minute);
+                      final diff = endDt.difference(startDt).inMinutes;
+                      if (diff > 0) durationMinutes = diff;
+                    }
+                  }
+                });
+              }
+            }
+
+            // Hàm AI (Giữ nguyên logic cũ)
             Future<void> askAI() async {
-              if (titleController.text.isEmpty) return;
+              if (titleController.text.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text("Nhập tiêu đề trước đã!")));
+                return;
+              }
               setState(() => isAnalyzing = true);
               try {
-                final suggestion = await geminiService.analyzeTaskPriority(
-                    titleController.text, descController.text);
-                if (suggestion != null)
-                  setState(() => selectedQuadrant = suggestion);
-              } catch (e) {
-                // Ignore error
-              } finally {
+                final suggestion =
+                    await geminiService.analyzeAndSuggest(titleController.text);
+                if (suggestion != null) {
+                  setState(() {
+                    selectedQuadrant = suggestion.quadrant;
+                    descController.text = suggestion.description;
+                    durationMinutes = suggestion.durationMinutes;
+                    // Nếu AI gợi ý xong, ta có thể reset giờ để người dùng tự xếp hoặc Auto-schedule sau
+                  });
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                        content: Text(
+                            "✨ AI: ${suggestion.durationMinutes}p - ${suggestion.description}"),
+                        backgroundColor: Colors.deepPurple));
+                  }
+                }
+              } catch (e) {/*...*/} finally {
                 setState(() => isAnalyzing = false);
               }
             }
@@ -456,6 +542,7 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // 1. NHẬP LIỆU CƠ BẢN
                     TextField(
                         controller: titleController,
                         decoration: const InputDecoration(
@@ -469,12 +556,16 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                             border: OutlineInputBorder()),
                         maxLines: 2),
                     const SizedBox(height: 12),
+
+                    // 2. AI & PHÂN LOẠI
                     Row(children: [
                       Expanded(
                           child: InputDecorator(
                               decoration: const InputDecoration(
                                   labelText: "Ưu tiên",
-                                  border: OutlineInputBorder()),
+                                  border: OutlineInputBorder(),
+                                  contentPadding:
+                                      EdgeInsets.symmetric(horizontal: 10)),
                               child: DropdownButtonHideUnderline(
                                   child: DropdownButton<EisenhowerQuadrant>(
                                       value: selectedQuadrant,
@@ -484,13 +575,15 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                                               value: q,
                                               child: Text(q.title,
                                                   style: TextStyle(
-                                                      color: q.headerColor))))
+                                                      color: q.headerColor,
+                                                      fontSize: 13))))
                                           .toList(),
                                       onChanged: (val) {
                                         if (val != null)
                                           setState(
                                               () => selectedQuadrant = val);
                                       })))),
+                      const SizedBox(width: 8),
                       IconButton.filledTonal(
                           onPressed: isAnalyzing ? null : askAI,
                           icon: isAnalyzing
@@ -499,9 +592,119 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                                   height: 20,
                                   child:
                                       CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.auto_awesome),
-                          tooltip: "AI Gợi ý")
+                              : const Icon(Icons.auto_awesome,
+                                  color: Colors.deepPurple),
+                          tooltip: "AI Phân tích")
                     ]),
+
+                    const Divider(height: 30),
+
+                    // 3. CHỌN LỊCH TRÌNH THỦ CÔNG (PHẦN MỚI)
+                    const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text("Lịch trình (Tùy chọn):",
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey))),
+                    const SizedBox(height: 8),
+
+                    // Chọn Ngày
+                    InkWell(
+                      onTap: pickDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 10, horizontal: 12),
+                        decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(8)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today,
+                                size: 18, color: Colors.deepPurple),
+                            const SizedBox(width: 8),
+                            Text(
+                                "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Chọn Giờ Bắt đầu & Kết thúc
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => pickTime(isStart: true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 12),
+                              decoration: BoxDecoration(
+                                  border:
+                                      Border.all(color: Colors.grey.shade400),
+                                  borderRadius: BorderRadius.circular(8)),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.access_time,
+                                      size: 18, color: Colors.green),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                      selectedStartTime?.format(context) ??
+                                          "Bắt đầu",
+                                      style: TextStyle(
+                                          color: selectedStartTime == null
+                                              ? Colors.grey
+                                              : Colors.black)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => pickTime(isStart: false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 12),
+                              decoration: BoxDecoration(
+                                  border:
+                                      Border.all(color: Colors.grey.shade400),
+                                  borderRadius: BorderRadius.circular(8)),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.access_time_filled,
+                                      size: 18, color: Colors.redAccent),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                      selectedEndTime?.format(context) ??
+                                          "Kết thúc",
+                                      style: TextStyle(
+                                          color: selectedEndTime == null
+                                              ? Colors.grey
+                                              : Colors.black)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (selectedStartTime == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text("Nếu không chọn giờ, AI sẽ tự sắp xếp sau.",
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.orange.shade800,
+                                fontStyle: FontStyle.italic)),
+                      )
                   ],
                 ),
               ),
@@ -522,18 +725,51 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
                 ElevatedButton(
                     onPressed: () {
                       if (titleController.text.isEmpty) return;
+
+                      // Xử lý ghép Ngày + Giờ thành DateTime hoàn chỉnh
+                      DateTime? finalStartTime;
+                      DateTime? finalEndTime;
+
+                      if (selectedStartTime != null) {
+                        finalStartTime = DateTime(
+                            selectedDate.year,
+                            selectedDate.month,
+                            selectedDate.day,
+                            selectedStartTime!.hour,
+                            selectedStartTime!.minute);
+
+                        if (selectedEndTime != null) {
+                          finalEndTime = DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              selectedEndTime!.hour,
+                              selectedEndTime!.minute);
+                          // Tính lại duration chính xác theo giờ người dùng chọn
+                          durationMinutes =
+                              finalEndTime.difference(finalStartTime).inMinutes;
+                        } else {
+                          // Nếu chỉ chọn giờ bắt đầu, tự cộng duration dự kiến
+                          finalEndTime = finalStartTime
+                              .add(Duration(minutes: durationMinutes));
+                        }
+                      }
+
                       final task = TaskEntity(
-                          id: isEditing
-                              ? taskToEdit.id
-                              : DateTime.now()
-                                  .millisecondsSinceEpoch
-                                  .toString(),
-                          title: titleController.text,
-                          description: descController.text,
-                          dueDate: DateTime.now(),
-                          quadrant: selectedQuadrant,
-                          isCompleted:
-                              isEditing ? taskToEdit.isCompleted : false);
+                        id: isEditing
+                            ? taskToEdit.id
+                            : DateTime.now().millisecondsSinceEpoch.toString(),
+                        title: titleController.text,
+                        description: descController.text,
+                        dueDate: selectedDate, // Lưu ngày vào dueDate
+                        quadrant: selectedQuadrant,
+                        isCompleted: isEditing ? taskToEdit.isCompleted : false,
+                        durationMinutes: durationMinutes,
+                        startTime:
+                            finalStartTime, // Lưu giờ bắt đầu (có thể null)
+                        endTime: finalEndTime, // Lưu giờ kết thúc (có thể null)
+                      );
+
                       isEditing
                           ? context.read<TaskBloc>().add(UpdateTaskEvent(task))
                           : context.read<TaskBloc>().add(AddTaskEvent(task));
