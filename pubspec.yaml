@@ -1,0 +1,55 @@
+name: time_management
+description: A new Flutter project for Time Management.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0" # ĐÂY LÀ PHẦN BẠN BỊ THIẾU
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- State Management & Architecture ---
+  flutter_bloc: ^8.1.3
+  equatable: ^2.0.5
+  dartz: ^0.10.1
+  get_it: ^7.6.0
+  injectable: ^2.3.2 # Hỗ trợ sinh code DI tự động
+
+  # --- Local Database (Offline-first) ---
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # --- Utilities ---
+  uuid: ^4.2.1
+  intl: ^0.18.1
+  connectivity_plus: ^5.0.2
+  path_provider: ^2.1.1
+
+  # --- UI & Icons ---
+  cupertino_icons: ^1.0.2
+  internet_connection_checker: ^1.0.0+1
+  fl_chart: ^0.66.0
+
+  flutter_local_notifications: ^16.0.0
+  permission_handler: ^11.0.1 # Để xin quyền thông báo
+  google_generative_ai: 0.4.6
+  google_fonts: ^6.1.0 # Font chữ đẹp hơn
+  percent_indicator: ^4.2.3 # Vẽ thanh Level đẹp
+  confetti: ^0.7.0 # Pháo giấy khi lên cấp
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+  # --- Code Generation (Bắt buộc cho Hive & Injectable) ---
+  build_runner: ^2.4.6
+  hive_generator: ^2.0.1
+  injectable_generator: ^2.4.1
+
+flutter:
+  uses-material-design: true
+  # assets:
+  #   - assets/images/
