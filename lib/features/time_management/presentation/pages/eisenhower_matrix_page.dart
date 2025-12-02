@@ -507,30 +507,60 @@ class _EisenhowerMatrixPageState extends State<EisenhowerMatrixPage> {
 
             // Hàm AI (Giữ nguyên logic cũ)
             Future<void> askAI() async {
-              if (titleController.text.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text("Nhập tiêu đề trước đã!")));
-                return;
-              }
+              if (titleController.text.isEmpty) return;
+
               setState(() => isAnalyzing = true);
+
               try {
                 final suggestion =
                     await geminiService.analyzeAndSuggest(titleController.text);
+
                 if (suggestion != null) {
                   setState(() {
+                    // 1. Điền thông tin cơ bản
                     selectedQuadrant = suggestion.quadrant;
                     descController.text = suggestion.description;
                     durationMinutes = suggestion.durationMinutes;
-                    // Nếu AI gợi ý xong, ta có thể reset giờ để người dùng tự xếp hoặc Auto-schedule sau
+
+                    // 2. XỬ LÝ THỜI GIAN NẾU AI TÌM THẤY
+                    if (suggestion.timeContext != null) {
+                      try {
+                        // Parse chuỗi "17:00" thành TimeOfDay
+                        final parts = suggestion.timeContext!.split(':');
+                        final hour = int.parse(parts[0]);
+                        final minute = int.parse(parts[1]);
+
+                        // Cập nhật biến selectedStartTime
+                        selectedStartTime =
+                            TimeOfDay(hour: hour, minute: minute);
+
+                        // Tự động tính EndTime luôn
+                        final tempDate = DateTime.now();
+                        final startDt = DateTime(tempDate.year, tempDate.month,
+                            tempDate.day, hour, minute);
+                        final endDt =
+                            startDt.add(Duration(minutes: durationMinutes));
+                        selectedEndTime = TimeOfDay.fromDateTime(endDt);
+                      } catch (e) {
+                        print("Lỗi parse giờ AI: $e");
+                      }
+                    }
                   });
+
                   if (ctx.mounted) {
+                    String msg = "✨ Đã phân tích!";
+                    if (selectedStartTime != null) {
+                      msg +=
+                          " Đã đặt lịch lúc ${selectedStartTime!.format(context)}.";
+                    }
                     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                        content: Text(
-                            "✨ AI: ${suggestion.durationMinutes}p - ${suggestion.description}"),
+                        content: Text(msg),
                         backgroundColor: Colors.deepPurple));
                   }
                 }
-              } catch (e) {/*...*/} finally {
+              } catch (e) {
+                // Ignore
+              } finally {
                 setState(() => isAnalyzing = false);
               }
             }
